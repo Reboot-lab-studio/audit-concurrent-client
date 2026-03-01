@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Votre site parle à qui ? — Audit automatique</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg:#FAFAF7;--card:#FFFFFF;--input:#F2F0EB;
+  --accent:#B8860B;--accent-light:#F5ECD7;
+  --text:#1A1A1A;--text-sec:#4A4A4A;--text-muted:#7A7A7A;--border:#D9D5CC;
+  --green:#2D7A4F;--green-bg:#E6F4EC;
+  --orange:#C06B20;--orange-bg:#FDF0E2;
+  --red:#B03A3A;--red-bg:#FDEAEA;
+  --blue:#2E6BA6;--blue-bg:#E4EFF9;
+  --purple:#6B4C9A;--purple-bg:#F0EBF8;
+  --teal:#1A7A6D;--teal-bg:#E0F5F1;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+.header{padding:40px 28px 32px;border-bottom:2px solid var(--border);background:#fff}
+.header-inner{max-width:880px;margin:0 auto}
+.chapter-tag{font-size:14px;letter-spacing:3px;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:10px}
+h1{font-family:'DM Serif Display',Georgia,serif;font-size:36px;font-weight:400;line-height:1.2}
+.subtitle{color:var(--text-sec);font-size:17px;margin-top:8px;line-height:1.5}
+.container{max-width:880px;margin:0 auto;padding:32px 28px 80px}
+.card{background:var(--card);border-radius:12px;border:2px solid var(--border);padding:24px 28px;margin-bottom:20px}
+.label{font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+input[type="text"],input[type="password"]{width:100%;background:var(--input);border:2px solid var(--border);border-radius:10px;padding:14px 18px;font-size:17px;font-family:inherit;font-weight:500;color:var(--text);outline:none}
+input:focus{border-color:var(--accent)}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap}
+.btn:disabled{opacity:.6;cursor:not-allowed;background:var(--text-muted)}
+.btn-outline{background:transparent;border:2px solid var(--border);color:var(--text-muted);font-weight:600}
+.btn-word{background:var(--accent);color:#fff}
+.flex{display:flex;gap:12px;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.serif{font-family:'DM Serif Display',Georgia,serif}
+.hidden{display:none}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;background:var(--input);border-radius:10px;padding:4px;margin-bottom:24px}
+.tab{flex:1;padding:10px 14px;border:none;border-radius:8px;background:transparent;cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;color:var(--text-muted)}
+.tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* Score circle */
+.score-circle{width:110px;height:110px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;flex-shrink:0}
+.score-pct{font-size:34px;font-weight:800;line-height:1}
+.score-label{font-size:11px;font-weight:600}
+
+/* Badge */
+.badge{font-size:12px;padding:3px 10px;border-radius:6px;font-weight:700;white-space:nowrap;display:inline-block}
+
+/* Gauge */
+.gauge{height:14px;border-radius:7px;background:var(--input);overflow:hidden;display:flex}
+.gauge-seg{transition:width .5s}
+.gauge-bar{height:8px;border-radius:4px;background:var(--input);overflow:hidden;margin-bottom:8px}
+.gauge-bar-fill{height:100%;border-radius:4px;transition:width .5s;min-width:4px}
+
+/* Phrase card */
+.phrase-card{background:var(--card);border-radius:12px;padding:18px 22px;margin-bottom:10px;border:2px solid var(--border)}
+.phrase-icon{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:6px;font-size:12px;font-weight:800}
+.phrase-tag{font-size:11px;font-weight:700;color:#fff;border-radius:4px;padding:1px 7px}
+.phrase-loc{background:var(--input);border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600}
+.suggestion-box{border-radius:8px;padding:10px 14px;margin-top:10px;border-left:3px solid var(--green);background:var(--green-bg)}
+.suggestion-label{font-size:13px;font-weight:700;color:var(--green)}
+
+/* Before/After */
+.ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ba-box{border-radius:8px;padding:10px 14px}
+.ba-box.before{background:var(--red-bg);border-left:3px solid var(--red)}
+.ba-box.after{background:var(--green-bg);border-left:3px solid var(--green)}
+.ba-label{font-size:11px;font-weight:700;margin-bottom:3px}
+
+/* Loading */
+.spinner{display:inline-block;width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Axis card (empty state) */
+.axis-card{border-radius:12px;padding:18px 16px}
+.axis-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.axis-desc{font-size:13px;color:var(--text-sec);line-height:1.5;margin-bottom:8px}
+.axis-example{background:#fff;border-radius:8px;padding:8px 12px;font-size:13px}
+
+/* Usage dots */
+.usage-dot{width:12px;height:12px;border-radius:50%;background:var(--green);display:inline-block}
+.usage-dot.used{background:var(--border)}
+
+/* Footer */
+.footer{padding:20px 28px;border-top:2px solid var(--border);text-align:center;font-size:14px;color:var(--text-muted);font-weight:500;background:#fff}
+
+/* Error */
+.error-box{background:var(--red-bg);border:2px solid var(--red);border-radius:12px;padding:16px 20px;margin-bottom:20px}
+
+/* Responsive */
+@media(max-width:700px){
+  .grid2,.grid3,.ba-grid{grid-template-columns:1fr}
+  h1{font-size:28px}
+  .container{padding:20px 16px 60px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="chapter-tag">Chapitre 4 — Audit automatique</div>
+    <h1>Votre site parle à qui ?</h1>
+    <p class="subtitle">L'IA analyse votre site sur 6 axes : vocabulaire non contextualisé, processus sans résultat, promesses vagues, preuves absentes, équilibre émotion/logique, et ratio nous/vous.</p>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Config Worker (invisible) -->
+  <div class="card" id="api-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text)">🔒 Analyse sécurisée par IA</div>
+        <div style="font-size:14px;color:var(--text-muted)">5 analyses gratuites par jour</div>
+      </div>
+      <div id="usage-counter" style="display:flex;gap:6px">
+        <span class="usage-dot"></span><span class="usage-dot"></span><span class="usage-dot"></span><span class="usage-dot"></span><span class="usage-dot"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- URL -->
+  <div class="card">
+    <div class="label">Adresse de votre site</div>
+    <div class="flex">
+      <input type="text" id="site-url" placeholder="www.monsite.com" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')runAudit()">
+      <button class="btn" id="audit-btn" onclick="runAudit()">Analyser mon site</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="hidden" id="loading" style="text-align:center;padding:56px 24px">
+    <div class="spinner"></div>
+    <div id="loading-title" style="margin-top:20px;font-size:18px;font-weight:600;color:var(--text-sec)"></div>
+    <div id="loading-sub" style="margin-top:8px;font-size:15px;color:var(--text-muted)"></div>
+  </div>
+
+  <!-- Error -->
+  <div class="hidden" id="error-box" class="error-box"></div>
+
+  <!-- Results -->
+  <div class="hidden" id="results"></div>
+
+  <!-- Empty state -->
+  <div id="empty-state" style="padding:32px 0">
+    <div class="serif" style="font-size:24px;text-align:center;margin-bottom:24px">6 axes d'analyse</div>
+    <div class="grid3" style="margin-bottom:20px">
+      <div class="axis-card" style="background:var(--red-bg);border:2px solid #B03A3A20">
+        <div class="axis-title" style="color:var(--red)">Vocabulaire non contextualisé</div>
+        <div class="axis-desc">Termes experts sans lien avec un bénéfice client.</div>
+        <div class="axis-example"><div style="color:var(--red);font-weight:600">"PNL, Process Com"</div><div style="color:var(--green);font-weight:600;margin-top:4px">→ "La PNL pour désamorcer les conflits"</div></div>
+      </div>
+      <div class="axis-card" style="background:var(--orange-bg);border:2px solid #C06B2020">
+        <div class="axis-title" style="color:var(--orange)">Processus sans résultat</div>
+        <div class="axis-desc">Comment vous travaillez, pas ce que le client obtient.</div>
+        <div class="axis-example"><div style="color:var(--orange);font-weight:600">"Je vous accompagne"</div><div style="color:var(--green);font-weight:600;margin-top:4px">→ "En 6 mois, vous doublez votre CA"</div></div>
+      </div>
+      <div class="axis-card" style="background:var(--blue-bg);border:2px solid #2E6BA620">
+        <div class="axis-title" style="color:var(--blue)">Promesses vagues</div>
+        <div class="axis-desc">Phrases creuses où le client ne se projette pas.</div>
+        <div class="axis-example"><div style="color:var(--blue);font-weight:600">"Libérez votre potentiel"</div><div style="color:var(--green);font-weight:600;margin-top:4px">→ "Reprenez le contrôle de votre agenda en 30 jours"</div></div>
+      </div>
+    </div>
+    <div class="grid3" style="margin-bottom:32px">
+      <div class="axis-card" style="background:var(--purple-bg);border:2px solid #6B4C9A20">
+        <div class="axis-title" style="color:var(--purple)">Preuves absentes</div>
+        <div class="axis-desc">Affirmations sans chiffres ni témoignages.</div>
+        <div class="axis-example"><div style="color:var(--purple);font-weight:600">"Leader en transformation"</div><div style="color:var(--green);font-weight:600;margin-top:4px">→ "150 entreprises accompagnées"</div></div>
+      </div>
+      <div class="axis-card" style="background:var(--teal-bg);border:2px solid #1A7A6D20">
+        <div class="axis-title" style="color:var(--teal)">Équilibre émotion/logique</div>
+        <div class="axis-desc">Trop inspirant sans substance, ou trop factuel sans connexion.</div>
+        <div class="axis-example"><div style="color:var(--teal);font-weight:600">"Ensemble, créons l'avenir"</div><div style="color:var(--green);font-weight:600;margin-top:4px">→ Ajoutez un chiffre ou un témoignage</div></div>
+      </div>
+      <div class="axis-card" style="background:var(--accent-light);border:2px solid #B8860B20">
+        <div class="axis-title" style="color:var(--accent)">Ratio nous/vous</div>
+        <div class="axis-desc">Votre page parle-t-elle de vous ou de votre visiteur ?</div>
+        <div class="axis-example"><div style="color:var(--accent);font-weight:600">12× "nous" vs 3× "vous"</div><div style="color:var(--green);font-weight:600;margin-top:4px">→ Inversez le ratio</div></div>
+      </div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:44px;margin-bottom:12px">🌐</div>
+      <div style="font-size:20px;font-weight:600;color:var(--text-sec)">Entrez l'adresse de votre site ci-dessus</div>
+      <div style="font-size:15px;color:var(--text-muted);max-width:540px;margin:8px auto 0;line-height:1.6">L'IA lit votre page d'accueil et les pages accessibles. Chaque phrase est analysée sur 6 axes avec des suggestions concrètes. Vous pouvez télécharger les résultats en Word.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Chapitre 4 — Audit automatique — Guide stratégique du Personal Branding par Benjamin Chaminade
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// CONFIG & DATA
+// ════════════════════════════════════════════════
+var AXES = {
+  client:    {col:"#2D7A4F",bg:"#E6F4EC",label:"Orienté client",icon:"✓",short:"CLIENT"},
+  vocab:     {col:"#B03A3A",bg:"#FDEAEA",label:"Vocabulaire non contextualisé",icon:"✗",short:"VOCAB"},
+  processus: {col:"#C06B20",bg:"#FDF0E2",label:"Processus sans résultat",icon:"✗",short:"PROCESSUS"},
+  vague:     {col:"#2E6BA6",bg:"#E4EFF9",label:"Promesse vague",icon:"~",short:"VAGUE"},
+  preuve:    {col:"#6B4C9A",bg:"#F0EBF8",label:"Preuve absente",icon:"?",short:"PREUVE"},
+  equilibre: {col:"#1A7A6D",bg:"#E0F5F1",label:"Déséquilibre émotion/logique",icon:"⚖",short:"ÉQUILIBRE"},
+  mixte:     {col:"#B8860B",bg:"#F5ECD7",label:"Mixte",icon:"~",short:"MIXTE"}
+};
+function gax(v){return AXES[v]||AXES.mixte;}
+var currentResult = null;
+var currentTab = "diagnostic";
+
+// ════════════════════════════════════════════════
+// PROMPTS
+// ════════════════════════════════════════════════
+function promptFetch(url){
+  return "Va sur cette page web et extrais TOUT le texte visible : "+url+"\nExtrais : titre principal, sous-titre, tous titres de sections, descriptions de services, listes de compétences/outils/méthodologies, témoignages clients, appels à l'action (boutons), texte \"à propos\", labels du menu.\nNavigue aussi vers les pages accessibles depuis le menu (services, à propos, offres) et extrais leur contenu.\nRetourne le texte brut organisé par page et section, sans commentaire.";
+}
+
+var PROMPT_ANALYZE = "Expert en personal branding et copywriting. Tu audites des sites web sur 6 axes. IMPORTANT : rédige en français avec les accents.\n\n## 6 AXES D'ANALYSE\n\n### AXE 1 : Vocabulaire non contextualisé (verdict:\"vocab\")\nLe problème N'EST PAS d'utiliser des termes experts. C'est de les utiliser SANS les relier à un bénéfice client.\n- \"PNL\" seul = vide de sens pour le visiteur. \"La PNL pour désamorcer les conflits en réunion\" = contextualisé.\nQuand tu détectes du vocabulaire expert isolé, ne dis pas \"enlevez le jargon\" mais \"reliez ce terme à un résultat concret pour votre client\".\n\n### AXE 2 : Processus sans résultat (verdict:\"processus\")\nLe propriétaire décrit CE QU'IL FAIT au lieu de CE QUE LE CLIENT OBTIENT.\nSignaux : \"je vous accompagne\", \"nous analysons\", \"notre méthode en X étapes\", \"X ans d'expérience\".\n\n### AXE 3 : Promesses vagues (verdict:\"vague\")\nPhrases creuses où le visiteur ne peut pas se projeter concrètement.\nSignaux : \"libérez votre potentiel\", \"solutions innovantes\", \"excellence opérationnelle\", \"sur-mesure\".\n\n### AXE 4 : Preuves absentes (verdict:\"preuve\")\nAffirmations sans crédibilité. \"Leader\", \"expert reconnu\", \"résultats exceptionnels\" sans chiffres, témoignages, logos.\nNOTE : les témoignages, chiffres et logos clients SONT des preuves → classe-les \"client\".\n\n### AXE 5 : Déséquilibre émotion/logique (verdict:\"equilibre\")\nTrop émotionnel sans substance OU trop factuel sans connexion humaine. Un bon site alterne les deux.\n\n### AXE 6 : Ratio nous/vous (pas de verdict par phrase)\nComptage global \"nous/je/notre/mon\" vs \"vous/votre/vos\". Reporte dans ratio_nous_vous.\n\n## RÈGLES CRITIQUES\n\n1. NUANCE : un site n'est jamais 0% ou 100%. Trouve des points positifs ET négatifs.\n2. Titres de navigation (\"Nos services\", \"Contact\") : ne les analyse PAS.\n3. TITRES COURTS ET IMPACTANTS (\"Coaching\", \"Formation\", \"Résultats\", un slogan court) : NE PROPOSE JAMAIS de les remplacer par une phrase longue. Propose uniquement d'AJOUTER un sous-titre ou une phrase complémentaire en dessous (suggestion_type=\"completer\"). La suggestion doit rester courte (max 15 mots).\n4. Pour les suggestions de remplacement aussi, reste CONCIS : la suggestion doit être de longueur similaire à l'original.\n5. Témoignages avec résultat concret = \"client\".\n6. Vise 10 à 12 phrases analysées.\n7. Pour CHAQUE phrase non-client, propose une suggestion concrète et précise, spécifique au contenu du site (pas générique).\n8. Pour CHAQUE axe où tu as détecté des problèmes, fournis un exemple avant/après spécifique dans \"axes_detail\".\n\n## FORMAT JSON — sans backticks, sans texte autour\n\n{\"site_name\":\"nom\",\"site_type\":\"type\",\"phrases\":[{\"original\":\"phrase exacte\",\"location\":\"où\",\"verdict\":\"client/vocab/processus/vague/preuve/equilibre/mixte\",\"label\":\"description\",\"problem\":\"explication précise 1-2 phrases\",\"suggestion\":\"amélioration concrète et concise ou null\",\"suggestion_type\":\"remplacer/completer/null\",\"impact\":\"fort/moyen/faible\"}],\"counts\":{\"client\":0,\"vocab\":0,\"processus\":0,\"vague\":0,\"preuve\":0,\"equilibre\":0,\"mixte\":0},\"ratio_nous_vous\":{\"nous\":0,\"vous\":0,\"analyse\":\"interprétation en 1 phrase\"},\"axes_detail\":[{\"axe\":\"vocab\",\"titre\":\"Vocabulaire non contextualisé\",\"count\":0,\"diagnostic\":\"2 phrases d'analyse spécifique à ce site\",\"avant\":\"phrase du site\",\"apres\":\"version améliorée\"},{\"axe\":\"processus\",\"titre\":\"Processus sans résultat\",\"count\":0,\"diagnostic\":\"2 phrases\",\"avant\":\"phrase du site\",\"apres\":\"version améliorée\"},{\"axe\":\"vague\",\"titre\":\"Promesses vagues\",\"count\":0,\"diagnostic\":\"2 phrases\",\"avant\":\"phrase du site\",\"apres\":\"version améliorée\"},{\"axe\":\"preuve\",\"titre\":\"Preuves absentes\",\"count\":0,\"diagnostic\":\"2 phrases\",\"avant\":\"phrase du site\",\"apres\":\"version améliorée\"},{\"axe\":\"equilibre\",\"titre\":\"Équilibre émotion/logique\",\"count\":0,\"diagnostic\":\"2 phrases\",\"avant\":\"phrase du site\",\"apres\":\"version améliorée\"}],\"points_forts\":[\"3 éléments positifs spécifiques\"],\"points_amelioration\":[\"3 axes d'amélioration concrets\"],\"resume_actuel\":\"2 phrases : ce que le visiteur comprend aujourd'hui\",\"resume_ideal\":\"2 phrases : ce qu'il devrait comprendre pour passer à l'action\",\"suggestions_bonus\":[\"phrase complète à ajouter sur le site\",\"autre phrase\",\"encore une\"],\"actions\":[{\"priorite\":1,\"quoi\":\"action très précise\",\"ou\":\"endroit exact du site\",\"pourquoi\":\"impact attendu\",\"avant\":\"phrase actuelle problématique\",\"apres\":\"texte de remplacement concret\"},{\"priorite\":2,\"quoi\":\"action\",\"ou\":\"endroit\",\"pourquoi\":\"impact\",\"avant\":\"phrase actuelle\",\"apres\":\"remplacement\"},{\"priorite\":3,\"quoi\":\"action\",\"ou\":\"endroit\",\"pourquoi\":\"impact\",\"avant\":\"phrase actuelle\",\"apres\":\"remplacement\"},{\"priorite\":4,\"quoi\":\"action\",\"ou\":\"endroit\",\"pourquoi\":\"impact\",\"avant\":\"phrase actuelle\",\"apres\":\"remplacement\"},{\"priorite\":5,\"quoi\":\"action\",\"ou\":\"endroit\",\"pourquoi\":\"impact\",\"avant\":\"phrase actuelle\",\"apres\":\"remplacement\"}]}";
+
+// ════════════════════════════════════════════════
+// CONFIG — Remplace par l'URL de ton Cloudflare Worker
+// ════════════════════════════════════════════════
+var WORKER_URL = "https://audit-personal-branding.benjamin-e8c.workers.dev";
+// ↑↑↑ IMPORTANT : change cette URL après avoir déployé ton Worker
+
+var usageCount = 0;
+var DAILY_LIMIT = 5;
+
+function updateUsageDots(used) {
+  var dots = document.querySelectorAll(".usage-dot");
+  for (var i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle("used", i < used);
+  }
+}
+
+// ════════════════════════════════════════════════
+// API (via Cloudflare Worker proxy)
+// ════════════════════════════════════════════════
+function callAPI(msgs, sys, search) {
+  var body = {model:"claude-sonnet-4-20250514",max_tokens:8192,messages:msgs};
+  if(sys) body.system=sys;
+  if(search) body.tools=[{type:"web_search_20250305",name:"web_search"}];
+  return fetch(WORKER_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)
+  }).then(function(r){
+    // Lire les headers de rate limiting
+    var remaining = r.headers.get("X-RateLimit-Remaining");
+    var used = r.headers.get("X-RateLimit-Used");
+    if (used) { usageCount = parseInt(used); updateUsageDots(usageCount); }
+    if (r.status === 429) {
+      return r.json().then(function(d) { throw new Error(d.error || "Limite atteinte. Revenez demain."); });
+    }
+    return r.json();
+  }).then(function(d){
+    if(d.error) throw new Error(d.error.message || d.error);
+    return (d.content||[]).filter(function(b){return b.type==="text";}).map(function(b){return b.text;}).join("\n")||"";
+  });
+}
+
+function robustParse(raw) {
+  var s=raw.replace(/```json|```/g,"").trim();
+  var i=s.indexOf("{"),j=s.lastIndexOf("}");
+  if(i>=0&&j>i) s=s.substring(i,j+1);
+  s=s.replace(/,\s*}/g,"}").replace(/,\s*]/g,"]");
+  try{return JSON.parse(s);}catch(e){}
+  var markers=['"},','"],','"}]'];
+  for(var m=0;m<markers.length;m++){
+    var c=s.lastIndexOf(markers[m]);
+    if(c>s.length*0.4){
+      var t=s.substring(0,c+markers[m].length-1);
+      var ob=(t.match(/\[/g)||[]).length-(t.match(/\]/g)||[]).length;
+      var oc=(t.match(/\{/g)||[]).length-(t.match(/\}/g)||[]).length;
+      for(var k=0;k<ob;k++)t+="]";for(var k2=0;k2<oc;k2++)t+="}";
+      t=t.replace(/,\s*}/g,"}").replace(/,\s*]/g,"]");
+      try{return JSON.parse(t);}catch(e2){continue;}
+    }
+  }
+  throw new Error("Format invalide. Réessayez.");
+}
+
+function fix(r){
+  r.phrases=r.phrases||[];r.counts=r.counts||{};
+  ["client","vocab","processus","vague","preuve","equilibre","mixte"].forEach(function(k){
+    r.counts[k]=r.counts[k]||r.phrases.filter(function(p){return p.verdict===k;}).length;
+  });
+  r.ratio_nous_vous=r.ratio_nous_vous||{};
+  r.points_forts=r.points_forts||[];
+  r.points_amelioration=r.points_amelioration||[];
+  r.axes_detail=r.axes_detail||[];
+  r.actions=r.actions||[];
+  r.suggestions_bonus=r.suggestions_bonus||[];
+  return r;
+}
+
+// ════════════════════════════════════════════════
+// MAIN AUDIT
+// ════════════════════════════════════════════════
+function show(id){document.getElementById(id).classList.remove("hidden");}
+function hide(id){document.getElementById(id).classList.add("hidden");}
+function $(id){return document.getElementById(id);}
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML;}
+
+function runAudit(){
+  var url=$("site-url").value.trim();
+  if(!url){alert("Entrez l'adresse de votre site.");return;}
+  if(!url.startsWith("http"))url="https://"+url;
+
+  if(usageCount >= DAILY_LIMIT){
+    alert("Vous avez atteint la limite de "+DAILY_LIMIT+" analyses par jour. Revenez demain !");
+    return;
+  }
+
+  $("audit-btn").disabled=true;$("audit-btn").textContent="Analyse...";
+  hide("empty-state");hide("results");hide("error-box");show("loading");
+  $("loading-title").textContent="Lecture de votre site...";
+  $("loading-sub").textContent="Page d'accueil et pages accessibles";
+
+  callAPI([{role:"user",content:promptFetch(url)}],null,true)
+  .then(function(page){
+    if(!page||page.length<80) throw new Error("Impossible de lire le site. Vérifiez l'URL.");
+    $("loading-title").textContent="Analyse sur 6 axes...";
+    $("loading-sub").textContent="Vocabulaire, processus, promesses, preuves, équilibre, ratio";
+    var msg="Contenu du site "+url+":\n\n"+page.substring(0,7000)+"\n\nAnalyse sur les 6 axes. JSON valide uniquement, sans backticks. 10-12 phrases. Pour chaque phrase non-client, propose une suggestion.";
+    return callAPI([{role:"user",content:msg}],PROMPT_ANALYZE,false);
+  })
+  .then(function(raw){
+    var parsed=fix(robustParse(raw));
+    currentResult=parsed;
+    currentTab="diagnostic";
+    hide("loading");
+    renderResults(parsed);
+    show("results");
+    $("audit-btn").disabled=false;$("audit-btn").textContent="Analyser mon site";
+  })
+  .catch(function(err){
+    hide("loading");
+    $("error-box").className="error-box";
+    $("error-box").innerHTML='<span style="font-weight:700;color:var(--red)">Erreur : </span><span style="color:var(--text-sec)">'+esc(err.message)+'</span><div style="margin-top:10px"><button class="btn" style="background:var(--red);padding:8px 18px;font-size:14px" onclick="runAudit()">Réessayer</button></div>';
+    show("error-box");
+    $("audit-btn").disabled=false;$("audit-btn").textContent="Analyser mon site";
+  });
+}
+
+// ════════════════════════════════════════════════
+// RENDER
+// ════════════════════════════════════════════════
+function renderResults(r){
+  var tot=Math.max(Object.values(r.counts).reduce(function(a,b){return a+b;},0),1);
+  var pos=r.counts.client+(r.counts.mixte||0)*0.5;
+  var pCl=Math.round((pos/tot)*100);
+  var vLabel=pCl>=70?"Bien orienté clients":pCl>=45?"À rééquilibrer":"Majoritairement orienté concurrents";
+  var vCol=pCl>=70?"var(--green)":pCl>=45?"var(--orange)":"var(--red)";
+  var vBg=pCl>=70?"var(--green-bg)":pCl>=45?"var(--orange-bg)":"var(--red-bg)";
+  var vIco=pCl>=70?"✅":pCl>=45?"⚠️":"🔍";
+
+  var html='';
+
+  // Score card
+  html+='<div class="card" style="border-color:'+vCol+'">';
+  html+='<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:20px">';
+  html+='<div class="score-circle" style="background:'+vBg+';border:4px solid '+vCol+'"><span class="score-pct" style="color:'+vCol+'">'+pCl+'%</span><span class="score-label" style="color:'+vCol+'">client</span></div>';
+  html+='<div style="flex:1;min-width:220px">';
+  if(r.site_name) html+='<div style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:4px">'+esc(r.site_name)+(r.site_type?' — '+esc(r.site_type):'')+'</div>';
+  html+='<div class="serif" style="font-size:22px;font-weight:700;color:'+vCol+'">'+vIco+' '+vLabel+'</div>';
+  html+='<div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap">';
+  var axKeys=["client","vocab","processus","vague","preuve","equilibre","mixte"];
+  axKeys.forEach(function(k){
+    if((r.counts[k]||0)>0){
+      var a=gax(k);
+      html+='<span class="badge" style="color:'+a.col+';background:'+a.bg+'">'+r.counts[k]+' '+a.label.toLowerCase()+'</span>';
+    }
+  });
+  html+='</div></div></div>';
+  // Gauge
+  html+='<div class="gauge">';
+  axKeys.forEach(function(k){
+    if((r.counts[k]||0)>0){
+      html+='<div class="gauge-seg" style="width:'+Math.round(((r.counts[k]||0)/tot)*100)+'%;background:'+gax(k).col+'"></div>';
+    }
+  });
+  html+='</div>';
+  html+='<div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">';
+  axKeys.forEach(function(k){
+    if((r.counts[k]||0)>0){
+      html+='<span style="font-size:11px;font-weight:700;color:'+gax(k).col+'"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+gax(k).col+';margin-right:4px;vertical-align:middle"></span>'+gax(k).label+'</span>';
+    }
+  });
+  html+='</div>';
+  // Ratio
+  if(r.ratio_nous_vous&&r.ratio_nous_vous.nous!=null){
+    var nCol=r.ratio_nous_vous.nous>r.ratio_nous_vous.vous?"var(--red)":"var(--green)";
+    var vColR=r.ratio_nous_vous.vous>=r.ratio_nous_vous.nous?"var(--green)":"var(--orange)";
+    html+='<div style="margin-top:16px;padding:12px 16px;background:var(--input);border-radius:10px"><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">';
+    html+='<span style="font-size:13px;font-weight:700;color:var(--text-muted)">RATIO</span>';
+    html+='<span style="font-size:18px;font-weight:800;color:'+nCol+'">'+r.ratio_nous_vous.nous+'× nous/je</span>';
+    html+='<span style="color:var(--text-muted)">vs</span>';
+    html+='<span style="font-size:18px;font-weight:800;color:'+vColR+'">'+r.ratio_nous_vous.vous+'× vous</span>';
+    if(r.ratio_nous_vous.analyse) html+='<span style="font-size:14px;color:var(--text-sec)">'+esc(r.ratio_nous_vous.analyse)+'</span>';
+    html+='</div></div>';
+  }
+  html+='</div>';
+
+  // Tabs
+  html+='<div class="tabs">';
+  html+='<button class="tab active" data-tab="diagnostic" onclick="switchTab(\'diagnostic\')">Diagnostic</button>';
+  html+='<button class="tab" data-tab="phrases" onclick="switchTab(\'phrases\')">Analyse ('+r.phrases.length+')</button>';
+  html+='<button class="tab" data-tab="actions" onclick="switchTab(\'actions\')">Plan d\'action</button>';
+  html+='</div>';
+
+  html+='<div id="tab-diagnostic">'+renderDiagnostic(r,tot,pCl)+'</div>';
+  html+='<div id="tab-phrases" class="hidden">'+renderPhrases(r)+'</div>';
+  html+='<div id="tab-actions" class="hidden">'+renderActions(r)+'</div>';
+
+  // Buttons
+  html+='<div style="display:flex;gap:12px;justify-content:center;margin-top:32px;flex-wrap:wrap">';
+  html+='<button class="btn btn-word" id="word-btn" onclick="doExportWord()">📄 Télécharger en Word</button>';
+  html+='<button class="btn btn-outline" onclick="resetAudit()">Auditer un autre site</button>';
+  html+='</div>';
+
+  $("results").innerHTML=html;
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  ["diagnostic","phrases","actions"].forEach(function(t){
+    var el=document.getElementById("tab-"+t);
+    if(el)el.classList.toggle("hidden",t!==tab);
+  });
+  document.querySelectorAll(".tab").forEach(function(b){
+    b.classList.toggle("active",b.getAttribute("data-tab")===tab);
+  });
+}
+
+function renderDiagnostic(r,tot,pCl){
+  var h='<div class="card"><div class="serif" style="font-size:22px;margin-bottom:18px">Résultat par axe d\'analyse</div>';
+  ["vocab","processus","vague","preuve","equilibre"].forEach(function(k){
+    var a=gax(k);var count=r.counts[k]||0;
+    var pct=tot>0?Math.round((count/tot)*100):0;
+    var detail=null;
+    (r.axes_detail||[]).forEach(function(d){if(d.axe===k)detail=d;});
+    if(count===0&&!detail) return;
+    h+='<div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    h+='<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:'+a.col+';display:inline-block"></span><span style="font-size:15px;font-weight:700;color:'+a.col+'">'+(detail&&detail.titre?esc(detail.titre):a.label)+'</span></div>';
+    h+='<span style="font-size:14px;font-weight:700;color:'+(count>0?a.col:'var(--green)')+'">'+
+      (count>0?count+' détectée'+(count>1?'s':''):'✓ Aucune détectée')+'</span>';
+    h+='</div>';
+    h+='<div class="gauge-bar"><div class="gauge-bar-fill" style="width:'+pct+'%;background:'+a.col+'"></div></div>';
+    if(detail&&detail.diagnostic) h+='<div style="font-size:14px;color:var(--text-sec);line-height:1.6;margin-bottom:8px">'+esc(detail.diagnostic)+'</div>';
+    if(detail&&detail.avant&&detail.apres){
+      h+='<div class="ba-grid"><div class="ba-box before"><div class="ba-label" style="color:var(--red)">AVANT</div><div style="font-size:14px;color:var(--text);line-height:1.4">'+esc(detail.avant)+'</div></div>';
+      h+='<div class="ba-box after"><div class="ba-label" style="color:var(--green)">APRÈS</div><div style="font-size:14px;color:var(--text);line-height:1.4">'+esc(detail.apres)+'</div></div></div>';
+    }
+    h+='</div>';
+  });
+  // Client bar
+  h+='<div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:var(--green);display:inline-block"></span><span style="font-size:15px;font-weight:700;color:var(--green)">Orienté client</span></div>';
+  h+='<span style="font-size:14px;font-weight:700;color:var(--green)">'+(r.counts.client||0)+' phrase'+((r.counts.client||0)>1?'s':'')+'</span></div>';
+  h+='<div class="gauge-bar" style="margin-top:6px"><div class="gauge-bar-fill" style="width:'+pCl+'%;background:var(--green)"></div></div>';
+  h+='</div>';
+
+  // Points forts + amélioration
+  if(r.points_forts.length>0||r.points_amelioration.length>0){
+    h+='<div class="grid2">';
+    h+='<div style="background:var(--green-bg);border-radius:12px;padding:20px 22px;border:2px solid #2D7A4F30"><div style="font-size:16px;font-weight:700;color:var(--green);margin-bottom:10px">✅ Ce qui fonctionne</div>';
+    r.points_forts.forEach(function(p){h+='<div style="font-size:15px;color:var(--text-sec);line-height:1.6;margin-bottom:6px;padding-left:12px;border-left:2px solid #2D7A4F40">'+esc(p)+'</div>';});
+    h+='</div>';
+    h+='<div style="background:var(--orange-bg);border-radius:12px;padding:20px 22px;border:2px solid #C06B2030"><div style="font-size:16px;font-weight:700;color:var(--orange);margin-bottom:10px">🔍 Axes d\'amélioration</div>';
+    r.points_amelioration.forEach(function(p){h+='<div style="font-size:15px;color:var(--text-sec);line-height:1.6;margin-bottom:6px;padding-left:12px;border-left:2px solid #C06B2040">'+esc(p)+'</div>';});
+    h+='</div></div>';
+  }
+
+  // Résumé
+  if(r.resume_actuel){
+    h+='<div class="card"><div class="serif" style="font-size:22px;margin-bottom:14px">Ce que votre visiteur comprend vs ce qu\'il devrait comprendre</div>';
+    h+='<div class="grid2">';
+    h+='<div style="background:var(--red-bg);border-radius:10px;padding:14px 16px;border-left:4px solid var(--red)"><div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">AUJOURD\'HUI</div><div style="font-size:15px;color:var(--text);line-height:1.6">'+esc(r.resume_actuel)+'</div></div>';
+    h+='<div style="background:var(--green-bg);border-radius:10px;padding:14px 16px;border-left:4px solid var(--green)"><div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">OBJECTIF</div><div style="font-size:15px;color:var(--text);line-height:1.6">'+esc(r.resume_ideal||'')+'</div></div>';
+    h+='</div></div>';
+  }
+
+  // High impact
+  var hiImpact=r.phrases.filter(function(p){return p.verdict!=="client"&&p.impact==="fort";});
+  if(hiImpact.length>0){
+    h+='<div class="card" style="border-color:var(--accent)"><div class="serif" style="font-size:22px;color:var(--accent);margin-bottom:4px">À traiter en priorité</div>';
+    h+='<div style="font-size:14px;color:var(--text-muted);margin-bottom:16px">Ces éléments sont parmi les premiers que votre visiteur voit. Les corriger aura le plus grand impact.</div>';
+    hiImpact.forEach(function(p){h+=renderPhraseCard(p);});
+    h+='</div>';
+  }
+  return h;
+}
+
+function renderPhraseCard(p){
+  var a=gax(p.verdict);
+  var h='<div class="phrase-card" style="border-left:5px solid '+a.col+'">';
+  h+='<div style="display:flex;gap:10px;align-items:flex-start">';
+  h+='<span class="phrase-icon" style="background:'+a.bg+';color:'+a.col+'">'+a.icon+'</span>';
+  h+='<div style="flex:1">';
+  h+='<div style="font-size:16px;font-weight:600;color:var(--text);line-height:1.5">"'+esc(p.original)+'"</div>';
+  h+='<div style="font-size:13px;color:var(--text-muted);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+  h+='<span class="phrase-tag" style="background:'+a.col+'">'+a.short+'</span>';
+  if(p.location) h+='<span class="phrase-loc">'+esc(p.location)+'</span>';
+  if(p.impact==="fort") h+='<span style="font-size:11px;font-weight:700;color:var(--red)">IMPACT FORT</span>';
+  h+='</div>';
+  h+='<div style="font-size:14px;color:var(--text-sec);margin-top:6px;line-height:1.5">'+esc(p.problem)+'</div>';
+  h+='</div></div>';
+  if(p.suggestion){
+    h+='<div class="suggestion-box"><span class="suggestion-label">'+(p.suggestion_type==="completer"?"Ajoutez en dessous : ":"Remplacez par : ")+'</span>';
+    h+='<span style="font-size:15px;color:var(--text)">'+esc(p.suggestion)+'</span></div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+function renderPhrases(r){
+  var h='<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap">';
+  Object.keys(AXES).forEach(function(k){
+    var a=AXES[k];
+    h+='<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+a.col+';margin-right:4px;vertical-align:middle"></span>'+a.label+'</span>';
+  });
+  h+='</div>';
+  r.phrases.forEach(function(p){h+=renderPhraseCard(p);});
+  if(r.suggestions_bonus&&r.suggestions_bonus.length>0){
+    h+='<div style="background:var(--teal-bg);border-radius:12px;padding:24px 28px;margin-top:20px;border:2px solid var(--teal)">';
+    h+='<div class="serif" style="font-size:20px;color:var(--teal);margin-bottom:6px">Phrases à ajouter sur votre site</div>';
+    h+='<div style="font-size:14px;color:var(--text-muted);margin-bottom:14px">Ces phrases n\'existent pas encore sur votre site mais renforceraient votre message.</div>';
+    r.suggestions_bonus.forEach(function(s){
+      h+='<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px">';
+      h+='<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--teal);color:#fff;font-size:13px;font-weight:800;flex-shrink:0">+</span>';
+      h+='<span style="font-size:15px;color:var(--text);line-height:1.5">'+esc(s)+'</span></div>';
+    });
+    h+='</div>';
+  }
+  return h;
+}
+
+function renderActions(r){
+  var h='';
+  r.actions.forEach(function(a,i){
+    h+='<div class="card"><div style="display:flex;gap:14px;align-items:flex-start">';
+    h+='<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:15px;font-weight:800;flex-shrink:0">'+(a.priorite||i+1)+'</span>';
+    h+='<div style="flex:1"><div style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4">'+esc(a.quoi)+'</div>';
+    if(a.ou) h+='<div style="font-size:14px;color:var(--accent);font-weight:600;margin-top:4px">Où : '+esc(a.ou)+'</div>';
+    if(a.pourquoi) h+='<div style="font-size:14px;color:var(--text-muted);margin-top:4px">'+esc(a.pourquoi)+'</div>';
+    if(a.avant&&a.apres){
+      h+='<div class="ba-grid" style="margin-top:10px"><div class="ba-box before"><div class="ba-label" style="color:var(--red)">AVANT</div><div style="font-size:14px;color:var(--text)">'+esc(a.avant)+'</div></div>';
+      h+='<div class="ba-box after"><div class="ba-label" style="color:var(--green)">APRÈS</div><div style="font-size:14px;color:var(--text)">'+esc(a.apres)+'</div></div></div>';
+    } else if(a.exemple){
+      h+='<div class="suggestion-box" style="margin-top:8px"><span class="suggestion-label">Exemple : </span><span style="font-size:15px;color:var(--text)">'+esc(a.exemple)+'</span></div>';
+    }
+    h+='</div></div></div>';
+  });
+  // All suggestions
+  var sugg=r.phrases.filter(function(p){return p.suggestion;});
+  if(sugg.length>0){
+    h+='<div style="background:var(--accent-light);border-radius:12px;padding:24px 28px;margin-top:24px;border:2px solid var(--accent)">';
+    h+='<div class="serif" style="font-size:20px;color:var(--accent);margin-bottom:6px">Toutes les suggestions</div>';
+    h+='<div style="font-size:14px;color:var(--text-muted);margin-bottom:16px">'+sugg.length+' amélioration'+(sugg.length>1?'s':'')+'</div>';
+    sugg.forEach(function(p,i){
+      var a2=gax(p.verdict);
+      h+='<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:'+(i<sugg.length-1?'1px solid #B8860B44':'none')+'">';
+      h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">';
+      h+='<span style="font-size:11px;font-weight:700;color:#fff;background:'+a2.col+';border-radius:3px;padding:1px 6px">'+a2.short+'</span>';
+      if(p.location) h+='<span style="font-size:11px;color:var(--text-muted)">'+esc(p.location)+'</span>';
+      h+='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:'+(p.suggestion_type==="completer"?"var(--accent-light)":"var(--green-bg)")+';color:'+(p.suggestion_type==="completer"?"var(--accent)":"var(--green)")+';font-weight:600">'+(p.suggestion_type==="completer"?"À compléter":"À remplacer")+'</span>';
+      h+='</div>';
+      if(p.suggestion_type==="remplacer") h+='<div style="font-size:14px;color:var(--text-sec)"><span style="text-decoration:line-through;opacity:.6">'+esc(p.original)+'</span></div>';
+      else h+='<div style="font-size:14px;color:var(--text-sec)">"'+esc(p.original)+'"</div>';
+      h+='<div style="font-size:15px;color:var(--green);font-weight:600;margin-top:4px">'+(p.suggestion_type==="completer"?"+ ":"→ ")+esc(p.suggestion)+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+  return h;
+}
+
+function resetAudit(){
+  currentResult=null;hide("results");hide("error-box");show("empty-state");
+  $("site-url").value="";
+}
+
+// ════════════════════════════════════════════════
+// WORD EXPORT
+// ════════════════════════════════════════════════
+function Xw(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function xr(t,o){o=o||{};var r="<w:rPr>";if(o.font)r+='<w:rFonts w:ascii="'+o.font+'" w:hAnsi="'+o.font+'"/>';if(o.bold)r+="<w:b/>";if(o.italic)r+="<w:i/>";if(o.size)r+='<w:sz w:val="'+o.size+'"/><w:szCs w:val="'+o.size+'"/>';if(o.color)r+='<w:color w:val="'+o.color+'"/>';r+="</w:rPr>";return '<w:r>'+r+'<w:t xml:space="preserve">'+Xw(t)+'</w:t></w:r>';}
+function xp(runs,o){o=o||{};var p="<w:pPr>";if(o.style)p+='<w:pStyle w:val="'+o.style+'"/>';if(o.align)p+='<w:jc w:val="'+o.align+'"/>';if(o.spacing)p+='<w:spacing w:after="'+o.spacing+'"/>';p+="</w:pPr>";return '<w:p>'+p+(Array.isArray(runs)?runs.join(""):runs||"")+'</w:p>';}
+function xtc(content,w,shade){var t='<w:tcPr><w:tcW w:w="'+w+'" w:type="dxa"/><w:tcBorders><w:top w:val="single" w:sz="1" w:color="CCCCCC"/><w:bottom w:val="single" w:sz="1" w:color="CCCCCC"/><w:left w:val="single" w:sz="1" w:color="CCCCCC"/><w:right w:val="single" w:sz="1" w:color="CCCCCC"/></w:tcBorders>';if(shade)t+='<w:shd w:val="clear" w:fill="'+shade+'"/>';t+='<w:tcMar><w:top w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tcMar></w:tcPr>';return '<w:tc>'+t+content+'</w:tc>';}
+function xhc(t,w){return xtc(xp(xr(t,{bold:true,size:20,color:"2E5A4C"}),{align:"center"}),w,"EDF2F0");}
+function xdc(t,w,sh){return xtc(xp(xr(t||" ",{size:22})),w,sh||null);}
+function xtr(c){return "<w:tr>"+c.join("")+"</w:tr>";}
+function xtbl(r){return '<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr>'+r.join("")+"</w:tbl>";}
+function xpb(){return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';}
+function xh1(t){return xp(xr(t,{font:"Georgia",bold:true,size:36,color:"1B4332"}),{style:"Heading1"});}
+function xh3(t){return xp(xr(t,{bold:true,size:26,color:"2E5A4C"}),{style:"Heading3"});}
+function xbox(title,text){return '<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/></w:tblPr><w:tr>'+xtc(xp(xr(title,{bold:true,color:"1B4332",size:22}))+xp(xr(text,{size:22,color:"4A4A4A"})),9026,"F5ECD7")+"</w:tr></w:tbl>";}
+var VCOLS={client:"2D7A4F",vocab:"B03A3A",processus:"C06B20",vague:"2E6BA6",preuve:"6B4C9A",equilibre:"1A7A6D",mixte:"B8860B"};
+
+function buildWordBody(r){
+  var b="",FC="F5F5F0";
+  b+=xp("",{spacing:"400"});
+  b+=xp(xr("CHAPITRE 4 — AUDIT AUTOMATIQUE",{size:22,color:"666666",bold:true}),{align:"center"});
+  b+=xp(xr("Votre site parle à qui ?",{font:"Georgia",bold:true,size:44,color:"1B4332"}),{align:"center",spacing:"80"});
+  b+=xp(xr(r.site_name+(r.site_type?" — "+r.site_type:""),{italic:true,color:"666666",size:24}),{align:"center",spacing:"300"});
+  var tot=Math.max(Object.values(r.counts).reduce(function(a,c){return a+c;},0),1);
+  var pos=r.counts.client+(r.counts.mixte||0)*0.5;
+  var pct=Math.round((pos/tot)*100);
+  b+=xbox("Score global : "+pct+"% orienté client",r.counts.client+" orienté client, "+r.counts.vocab+" vocabulaire, "+r.counts.processus+" processus, "+r.counts.vague+" vague, "+r.counts.preuve+" preuve, "+r.counts.equilibre+" équilibre, "+r.counts.mixte+" mixte");
+  if(r.ratio_nous_vous.nous!=null){b+=xp("",{spacing:"100"});b+=xp([xr("Ratio nous/vous : ",{bold:true,color:"1B4332",size:22}),xr(r.ratio_nous_vous.nous+"× nous/je vs "+r.ratio_nous_vous.vous+"× vous. "+(r.ratio_nous_vous.analyse||""),{size:22})]);}
+  if(r.points_forts.length>0){b+=xpb()+xh1("Ce qui fonctionne");r.points_forts.forEach(function(p){b+=xp([xr("✅ ",{color:"2D7A4F",size:22}),xr(p,{size:22})]);});}
+  if(r.points_amelioration.length>0){b+=xp("",{spacing:"100"})+xh1("Axes d'amélioration");r.points_amelioration.forEach(function(p){b+=xp([xr("🔍 ",{size:22}),xr(p,{size:22})]);});}
+  if(r.axes_detail&&r.axes_detail.length>0){b+=xpb()+xh1("Résultat par axe d'analyse");r.axes_detail.forEach(function(d){b+=xh3((d.titre||d.axe)+" — "+(d.count||0)+" détectée"+(d.count>1?"s":""));if(d.diagnostic)b+=xp(xr(d.diagnostic,{size:22,color:"4A4A4A"}));if(d.avant&&d.apres){b+=xp("",{spacing:"60"});b+=xp([xr("Avant : ",{bold:true,color:"B03A3A",size:20}),xr(d.avant,{size:20,italic:true,color:"666666"})]);b+=xp([xr("Après : ",{bold:true,color:"2D7A4F",size:20}),xr(d.apres,{size:20,color:"2D7A4F"})]);}});}
+  if(r.resume_actuel){b+=xp("",{spacing:"200"});b+=xp([xr("Ce que votre visiteur comprend : ",{bold:true,color:"B03A3A",size:22}),xr(r.resume_actuel,{size:22,color:"4A4A4A"})]);b+=xp([xr("Ce qu'il devrait comprendre : ",{bold:true,color:"2D7A4F",size:22}),xr(r.resume_ideal||"",{size:22,color:"4A4A4A"})]);}
+  var ws=r.phrases.filter(function(p){return p.suggestion;});
+  if(ws.length>0){b+=xpb()+xh1("Analyse phrase par phrase");var rows=[xtr([xhc("Axe",1200),xhc("Phrase du site",3200),xhc("Problème",2200),xhc("Suggestion",2426)])];ws.forEach(function(p,i){var sh=i%2===0?FC:null;rows.push(xtr([xtc(xp(xr(gax(p.verdict).short,{bold:true,size:18,color:VCOLS[p.verdict]||"B8860B"}),{align:"center"}),1200,sh),xdc(p.original,3200,sh),xdc(p.problem,2200,sh),xtc(xp(xr((p.suggestion_type==="completer"?"+ ":"→ ")+p.suggestion,{size:20,color:"2D7A4F"})),2426,sh)]));});b+=xtbl(rows);}
+  if(r.suggestions_bonus.length>0){b+=xp("",{spacing:"200"})+xh1("Phrases à ajouter sur votre site");r.suggestions_bonus.forEach(function(s,i){b+=xp([xr((i+1)+". ",{bold:true,color:"2D7A4F",size:22}),xr(s,{size:22})]);});}
+  if(r.actions.length>0){b+=xpb()+xh1("Plan d'action");r.actions.forEach(function(a){b+=xh3("Action "+(a.priorite||"")+" : "+a.quoi);if(a.ou)b+=xp([xr("Où : ",{bold:true,color:"B8860B",size:22}),xr(a.ou,{size:22})]);if(a.pourquoi)b+=xp(xr(a.pourquoi,{size:22,color:"4A4A4A"}));if(a.avant&&a.apres){b+=xp([xr("Avant : ",{bold:true,color:"B03A3A",size:20}),xr(a.avant,{size:20,italic:true,color:"666666"})]);b+=xp([xr("Après : ",{bold:true,color:"2D7A4F",size:20}),xr(a.apres,{size:20,color:"2D7A4F"})]);}else if(a.exemple){b+=xbox("Exemple",a.exemple);}});}
+  b+=xp("",{spacing:"300"});
+  b+=xbox("Guide stratégique du Personal Branding par Benjamin Chaminade","Cet audit est un outil du chapitre 4. Les suggestions proposées sont générées par IA et doivent être adaptées à votre contexte.");
+  return b;
+}
+
+function doExportWord(){
+  if(!currentResult)return;
+  var btn=$("word-btn");btn.textContent="Génération...";btn.disabled=true;
+  setTimeout(function(){
+    try{
+      var zip=new JSZip();
+      zip.file("[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>');
+      zip.folder("_rels").file(".rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+      zip.folder("word").folder("_rels").file("document.xml.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+      zip.folder("word").file("styles.xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:color w:val="333333"/><w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:spacing w:before="360" w:after="200"/></w:pPr><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia"/><w:b/><w:sz w:val="36"/><w:color w:val="1B4332"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:pPr><w:spacing w:before="200" w:after="120"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/><w:color w:val="2E5A4C"/></w:rPr></w:style></w:styles>');
+      var body=buildWordBody(currentResult);
+      zip.folder("word").file("document.xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>'+body+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>');
+      zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}).then(function(blob){
+        var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+        a.download="Audit_Site_"+((currentResult.site_name||"").replace(/[^a-zA-Z0-9]/g,"_")||"resultats")+".docx";
+        document.body.appendChild(a);a.click();document.body.removeChild(a);
+        btn.textContent="✅ Téléchargé !";btn.disabled=false;
+        setTimeout(function(){btn.textContent="📄 Télécharger en Word";},3000);
+      });
+    }catch(e){
+      btn.textContent="❌ Erreur";btn.disabled=false;console.error(e);
+      setTimeout(function(){btn.textContent="📄 Télécharger en Word";},3000);
+    }
+  },100);
+}
+</script>
+</body>
+</html>
