@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Votre site parle à qui ? — Audit automatique</title>
+<title>Audit Concurrent / Client ? — À qui s'adresse votre site ?</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
@@ -246,22 +246,32 @@ function callAPI(msgs, sys, search) {
   var body = {model:"claude-sonnet-4-20250514",max_tokens:8192,messages:msgs};
   if(sys) body.system=sys;
   if(search) body.tools=[{type:"web_search_20250305",name:"web_search"}];
+  var controller = new AbortController();
+  var timeout = setTimeout(function(){ controller.abort(); }, 300000); // 5 min
   return fetch(WORKER_URL,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(body)
+    body:JSON.stringify(body),
+    signal:controller.signal
   }).then(function(r){
-    // Lire les headers de rate limiting
+    clearTimeout(timeout);
     var remaining = r.headers.get("X-RateLimit-Remaining");
     var used = r.headers.get("X-RateLimit-Used");
     if (used) { usageCount = parseInt(used); updateUsageDots(usageCount); }
     if (r.status === 429) {
       return r.json().then(function(d) { throw new Error(d.error || "Limite atteinte. Revenez demain."); });
     }
+    if (r.status === 524) {
+      throw new Error("L'analyse a pris trop de temps. Réessayez.");
+    }
     return r.json();
   }).then(function(d){
     if(d.error) throw new Error(d.error.message || d.error);
     return (d.content||[]).filter(function(b){return b.type==="text";}).map(function(b){return b.text;}).join("\n")||"";
+  }).catch(function(err){
+    clearTimeout(timeout);
+    if(err.name==="AbortError") throw new Error("L'analyse a pris trop de temps. Réessayez.");
+    throw err;
   });
 }
 
